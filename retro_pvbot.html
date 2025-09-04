@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retro Player vs Bot</title>
+<style>
+:root {
+  --bg:#000; --fg:#fff; --accent:#00ffe1; --warn:#ff3b3b; --heal:#33ff66; --panel:#0b0b0b; --border:#fff; --btn:#151515;
+}
+body {
+  margin:0; height:100vh; display:flex; justify-content:center; align-items:center; background:var(--bg); color:var(--fg);
+  font-family: monospace;
+}
+.crt {
+  position:relative; overflow:hidden; filter:contrast(1.05) saturate(1.05);
+}
+.crt:before {
+  content:""; position:absolute; inset:0;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 3px);
+  mix-blend-mode: overlay; pointer-events:none;
+}
+.crt:after {
+  content:""; position:absolute; inset:0; box-shadow: inset 0 0 0 3px var(--border), inset 0 0 40px rgba(0,255,200,.08); pointer-events:none;
+}
+.game {
+  width:min(900px,95vw); background:var(--panel); padding:16px; border:3px solid var(--border); border-radius:12px;
+}
+.topbar {display:flex; justify-content:space-between; margin-bottom:10px;}
+.title{font-weight:900; text-shadow:0 0 8px rgba(255,255,255,.45);}
+.arena{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.char{border:2px solid var(--border); padding:12px; border-radius:10px; background:#080808;}
+.char h3{margin:0 0 8px 0; font-size:16px;}
+.imgwrap{width:100%; aspect-ratio:4/3; border:2px solid var(--border); border-radius:8px; display:grid; place-items:center; overflow:hidden; position:relative;}
+.imgwrap img{width:100%; height:100%; object-fit:cover; image-rendering: pixelated;}
+.hpbar{margin-top:8px; border:2px solid var(--border); height:18px; border-radius:6px; background:#111; position:relative; overflow:hidden;}
+.hpfill{height:100%; width:100%; background: linear-gradient(90deg, #33ff66, #00ffa0); transition: width .25s ease;}
+.hptext{position:absolute; inset:0; display:grid; place-items:center; font-size:12px; text-shadow:0 0 6px rgba(0,0,0,.8);}
+.center{grid-column:1/-1; border:2px solid var(--border); border-radius:10px; padding:10px; margin-top:16px; background:#070707;}
+.log{height:140px; overflow:auto; padding:8px; background:#000; border:2px solid var(--border); border-radius:8px;}
+.log p{margin:.35rem 0;}
+.controls{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:10px;}
+button{font:inherit; background:var(--btn); color:var(--fg); border:2px solid var(--border); border-radius:10px; padding:14px 10px; cursor:pointer; transition: transform .06s ease, box-shadow .15s ease; box-shadow:0 2px 0 #444;}
+button:hover{transform: translateY(-1px);}
+button:active{transform: translateY(1px) scale(.99);}
+.danger{outline:2px solid var(--warn);}
+.healish{outline:2px solid var(--heal);}
+.special{outline:2px solid var(--accent);}
+.shake{animation:shake .18s linear 2;}
+@keyframes shake{0%,100%{transform:translate(0,0);}25%{transform:translate(-2px,1px);}50%{transform:translate(2px,-1px);}75%{transform:translate(-1px,2px);}}
+.float{position:absolute; font-weight:900; text-shadow:0 0 6px rgba(0,0,0,.8); animation:floatUp .9s ease forwards; pointer-events:none;}
+@keyframes floatUp{0%{opacity:0; transform:translateY(6px) scale(.9);}15%{opacity:1;}100%{opacity:0; transform:translateY(-28px) scale(1);}}
+.attackSprite{position:absolute; width:32px; height:32px; image-rendering:pixelated;}
+.footer{margin-top:10px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; align-items:center;}
+.tiny{font-size:11px; color:#888;}
+</style>
+</head>
+<body>
+<div class="game crt">
+  <div class="topbar">
+    <div class="title">★ RETRO DUEL: PLAYER vs BOT</div>
+    <div class="score">Wins: <span id="wins">0</span> • Losses: <span id="losses">0</span></div>
+  </div>
+  <div class="arena">
+    <div class="char" id="playerCard">
+      <h3>YOU</h3>
+      <div class="imgwrap" id="playerImgWrap">
+        <img id="playerImg" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 240'><rect width='100%' height='100%' fill='black'/><rect x='40' y='40' width='240' height='160' fill='%2300ffe1'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='black' font-family='monospace' font-size='28'>PLAYER</text></svg>">
+      </div>
+      <div class="hpbar"><div class="hpfill" id="php"></div><div class="hptext" id="phptext"></div></div>
+    </div>
+    <div class="char" id="botCard">
+      <h3>BOT</h3>
+      <div class="imgwrap" id="botImgWrap">
+        <img id="botImg" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 240'><rect width='100%' height='100%' fill='black'/><rect x='40' y='40' width='240' height='160' fill='%23ff3b3b'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='black' font-family='monospace' font-size='28'>BOT</text></svg>">
+      </div>
+      <div class="hpbar"><div class="hpfill" id="bhp"></div><div class="hptext" id="bhptext"></div></div>
+    </div>
+    <div class="center">
+      <div class="log" id="log"></div>
+      <div class="controls">
+        <button class="danger" id="btnAttack">ATTACK</button>
+        <button class="special" id="btnHeavy">HEAVY</button>
+        <button class="healish" id="btnHeal">HEAL</button>
+        <button id="btnDefend">DEFEND</button>
+      </div>
+      <div class="footer">
+        <div>
+          <button id="btnReset">RESET MATCH</button>
+          <button id="btnNewRound">NEW ROUND</button>
+        </div>
+        <div class="tiny">Retro vibes ✦ Undertale-style UI</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+const MAX_HP=100;
+const state={player:{hp:MAX_HP,shield:0},bot:{hp:MAX_HP,shield:0},turn:"player",over:false};
+let wins=+localStorage.getItem('retro_wins')||0;
+let losses=+localStorage.getItem('retro_losses')||0;
+const winsEl=document.getElementById('wins');
+const lossesEl=document.getElementById('losses');
+winsEl.textContent=wins; lossesEl.textContent=losses;
+const php=document.getElementById('php'); const phptext=document.getElementById('phptext');
+const bhp=document.getElementById('bhp'); const bhptext=document.getElementById('bhptext');
+const log=document.getElementById('log');
+const playerCard=document.getElementById('playerCard'); const botCard=document.getElementById('botCard');
+const btns={attack:document.getElementById('btnAttack'),heavy:document.getElementById('btnHeavy'),heal:document.getElementById('btnHeal'),defend:document.getElementById('btnDefend'),reset:document.getElementById('btnReset'),newRound:document.getElementById('btnNewRound')};
+
+function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
+function renderHP(){
+  php.style.width=(clamp(state.player.hp,0,MAX_HP)/MAX_HP*100)+"%";
+  bhp.style.width=(clamp(state.bot.hp,0,MAX_HP)/MAX_HP*100)+"%";
+  phptext.textContent=`HP: ${clamp(state.player.hp,0,MAX_HP)}/${MAX_HP}`+(state.player.shield?` [+${state.player.shield} SHIELD]`:'');
+  bhptext.textContent=`HP: ${clamp(state.bot.hp,0,MAX_HP)}/${MAX_HP}`+(state.bot.shield?` [+${state.bot.shield} SHIELD]`:'');
+}
+function addLog(text){const p=document.createElement('p'); p.textContent=text; log.appendChild(p); log.scrollTop=log.scrollHeight;}
+function floatText(card,text,color){const wrap=card.querySelector('.imgwrap'); const r=wrap.getBoundingClientRect(); const el=document.createElement('div'); el.className='float'; el.style.left=(Math.random()*(r.width-80)+20)+'px'; el.style.top=(Math.random()*(r.height-30)+10)+'px'; el.style.color=color||'white'; el.textContent=text; wrap.appendChild(el); setTimeout(()=>el.remove(),1100);}
+function shake(card){card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),220);}
+function endCheck(){
+  if(state.player.hp<=0||state.bot.hp<=0){state.over=true;
+  if(state.player.hp>0){wins++; localStorage.setItem('retro_wins',wins); addLog("YOU WIN! ★");}
+  else{losses++; localStorage.setItem('retro_losses',losses); addLog("BOT WINS! 💀");}
+  winsEl.textContent=wins; lossesEl.textContent=losses;
+  setControlsEnabled(false); return true;}
+  return false;
+}
+function setControlsEnabled(on){['attack','heavy','heal','defend'].forEach(k=>btns[k].disabled=!on);}
+function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function chance(p){return Math.random()*100<p;}
+function applyDamage(target,amount,sourceCard){
+  let blocked=0;
+  if(target.shield){blocked=Math.min(target.shield,amount); target.shield-=blocked; amount-=blocked;}
+  target.hp-=amount;
+  shake(sourceCard===playerCard?botCard:playerCard);
+  floatText(sourceCard===playerCard?botCard:playerCard,'-'+(amount+blocked>0?amount+blocked:0),'#ff3b3b');
+  renderHP();
+}
+function heal(target,amount){
+  target.hp=clamp(target.hp+amount,0,MAX_HP);
+  floatText(target===state.player?playerCard:botCard,'+'+amount,'#33ff66');
+  renderHP();
+}
+function playerMove(type){
+  if(state.over) return;
+  switch(type){
+    case 'attack': applyDamage(state.bot,rand(8,14),playerCard); addLog("You ATTACKED!"); break;
+    case 'heavy': applyDamage(state.bot,rand(15,25),playerCard); addLog("You used HEAVY ATTACK!"); break;
+    case 'heal': heal(state.player,rand(10,18)); addLog("You HEALED!"); break;
+    case 'defend': state.player.shield=rand(8,18); addLog("You raised a SHIELD!"); break;
+  }
+  if(!endCheck()){setTimeout(botTurn,600);}
+  setControlsEnabled(false);
+}
+function botTurn(){
+  if(state.over) return;
+  let choice=rand(1,4);
+  switch(choice){
+    case 1: applyDamage(state.player,rand(6,12),botCard); addLog("BOT ATTACKED!"); break;
+    case 2: applyDamage(state.player,rand(12,22),botCard); addLog("BOT used HEAVY ATTACK!"); break;
+    case 3: heal(state.bot,rand(8,15)); addLog("BOT HEALED!"); break;
+    case 4: state.bot.shield=rand(6,16); addLog("BOT raised SHIELD!"); break;
+  }
+  endCheck(); setControlsEnabled(!state.over);
+}
+function resetMatch(){state.player.hp=MAX_HP; state.bot.hp=MAX_HP; state.player.shield=0; state.bot.shield=0; state.over=false; renderHP(); log.innerHTML=''; setControlsEnabled(true);}
+btns.attack.onclick=()=>playerMove('attack');
+btns.heavy.onclick=()=>playerMove('heavy');
+btns.heal.onclick=()=>playerMove('heal');
+btns.defend.onclick=()=>playerMove('defend');
+btns.reset.onclick=()=>resetMatch();
+btns.newRound.onclick=()=>resetMatch();
+renderHP(); setControlsEnabled(true);
+})();
+</script>
+</body>
+</html>
